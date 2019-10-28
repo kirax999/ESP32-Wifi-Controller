@@ -20,6 +20,9 @@
 
 char data;
 unsigned long int timer;
+bool isConnected = false;
+
+int statusSpeed = 0;
 
 WiFiManager wifiManager;
 
@@ -34,13 +37,16 @@ void setup()
 {
     Serial.begin(9600);
     pinMode(LED,OUTPUT);
-
+    wifiManager.setDebugOutput(false);
     wifiManager.setAPCallback(configModeCallback);
     wifiManager.setTimeout(60);
     if(!wifiManager.autoConnect("Controller")) {
-      Serial.println("failed to connect and hit timeout");
+        Serial.println("failed to connect and hit timeout");
+        statusSpeed = INTERVAL;
     } else {
         Serial.println("Successfully connected");
+        isConnected = true;
+        statusSpeed = INTERVAL / 4;
     }
     
     Serial.print("IP address: ");
@@ -49,7 +55,6 @@ void setup()
 
 void loop()
 {
-    /*
     if(millis()-timer>=INTERVAL) {
         timer=millis();
         digitalWrite(LED,!digitalRead(LED));
@@ -58,16 +63,20 @@ void loop()
         else
             Serial.println("LED ON");
     } 
-*/
+
     if(Serial.available()) {
         data=Serial.read();
         if(data=='1')
         {
             WiFi.disconnect(false, true);
             delay(3000);
-            Serial.println("Reset wifi setting and restart");
+            Serial.println("Reset wifi setting and restart"); 
             wifiManager.resetSettings();
             ESP.restart();
         }
+    }
+
+    if (isConnected) {
+
     }
 }
