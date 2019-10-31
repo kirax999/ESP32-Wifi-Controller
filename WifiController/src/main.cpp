@@ -21,6 +21,7 @@
 #define INTERVAL  1000
 
 #define PORTUDP   1667
+#define PORTUDPSEND   1668
 #define BUFFERSIZE 1024
 
 char data;
@@ -31,6 +32,7 @@ WiFiManager wifiManager;
 
 IPAddress targetIP;
 WiFiUDP udp;
+WiFiUDP udpSend;
 char buffer[BUFFERSIZE];
 
 const int MPU_addr=0x68;
@@ -55,6 +57,7 @@ void setup()
     isConnected = true;
     statusSpeed = INTERVAL / 4;
     udp.begin(PORTUDP);
+    udpSend.begin(PORTUDPSEND);
 
     // Init MPU-6050
     Wire.begin();
@@ -105,6 +108,14 @@ void loop()
             tracker["z"] = value.z;
 
             serializeJson(tracker, jsonString);
+
+            udpSend.beginPacket(targetIP, PORTUDPSEND);
+            const char* lineChar = jsonString.c_str();
+            int i = 0;
+            while (lineChar[i] != 0)
+                udpSend.write((uint8_t)lineChar[i++]);
+            udpSend.endPacket();
+
             Serial.println(jsonString);
         }
     }
@@ -113,7 +124,7 @@ void loop()
 gyroscope getAngles() { // return Struc Gyroscope containe 3axis
     gyroscope result;
     
-    int16_t AcX,AcY,AcZ,Tmp,GyX,GyY,GyZ;
+    int16_t AcX,AcY,AcZ;
     int minVal=265;
     int maxVal=402;
 
