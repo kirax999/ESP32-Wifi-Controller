@@ -13,7 +13,9 @@
 #else
 #include <WebServer.h>
 #endif
-#include <WiFiManager.h>        //https://github.com/tzapu/WiFiManager
+#include <WiFiManager.h>
+#include <Wire.h>
+#include <ArduinoJson.h>
 
 #define LED       2
 #define INTERVAL  1000
@@ -27,37 +29,39 @@ bool isConnected = false;
 int statusSpeed = 0;
 WiFiManager wifiManager;
 
+IPAddress targetIP;
 WiFiUDP udp;
 char buffer[BUFFERSIZE];
 
-IPAddress targetIP;
+const int MPU_addr=0x68;
 
-void configModeCallback (WiFiManager *myWiFiManager) {
-    Serial.println("Entered config mode");
-    Serial.println(WiFi.softAPIP());
-    Serial.println(myWiFiManager->getConfigPortalSSID());
-}
+struct gyroscope {
+    double x;
+    double y;
+    double z;
+};
+
+gyroscope getAngles();
 
 void setup()
 {
+// put your setup code here, to run once:
     Serial.begin(9600);
     pinMode(LED,OUTPUT);
-    wifiManager.setDebugOutput(true);
-    wifiManager.setAPCallback(configModeCallback);
-    wifiManager.setTimeout(60);
-    if(!wifiManager.autoConnect("ESP32 Controller")) {
-        Serial.println("failed to connect and hit timeout");
-        statusSpeed = INTERVAL;
-    } else {
-        Serial.println("Successfully connected");
-        isConnected = true;
-        statusSpeed = INTERVAL / 4;
-        udp.begin(PORTUDP);
-        Serial.println("Ready !!!");
-    }
-    
-    Serial.print("IP address: ");
-    Serial.println(WiFi.localIP());    
+
+    //WiFiManager
+    statusSpeed = INTERVAL;
+    wifiManager.autoConnect("AutoConnectAP");
+    isConnected = true;
+    statusSpeed = INTERVAL / 4;
+    udp.begin(PORTUDP);
+
+    // Init MPU-6050
+    Wire.begin();
+    Wire.beginTransmission(MPU_addr);
+    Wire.write(0x6B);
+    Wire.write(0);
+    Wire.endTransmission(true);
 }
 
 void loop()
@@ -73,7 +77,7 @@ void loop()
         {
             WiFi.disconnect(false, true);
             delay(3000);
-            Serial.println("Reset wifi setting and restart"); 
+            Serial.println("Reset wifi setting and restart");
             wifiManager.resetSettings();
             ESP.restart();
         }
@@ -83,9 +87,50 @@ void loop()
         memset(buffer, 0, BUFFERSIZE);
         udp.parsePacket();
         if (udp.read(buffer, BUFFERSIZE) > 0) {
+            Serial.println(buffer);
             if (strcmp(buffer, "123456") == 0) {
                 targetIP = udp.remoteIP();
             }
         }
+
+        if (targetIP != INADDR_NONE) {
+            String jsonString = "";
+            statusSpeed = INTERVAL / 8;
+            gyroscope value;
+            value = getAngles();
+
+            DynamicJsonDocument tracker(1024);
+            tracker["x"] = value.x;
+            tracker["y"] = value.y;
+            tracker["z"] = value.z;
+
+            serializeJson(tracker, jsonString);
+            Serial.println(jsonString);
+        }
     }
+}
+
+gyroscope getAngles() { // return Struc Gyroscope containe 3axis
+    gyroscope result;
+    
+    int16_t AcX,AcY,AcZ,Tmp,GyX,GyY,GyZ;
+    int minVal=265;
+    int maxVal=402;
+
+    Wire.beginTransmission(MPU_addr);
+    Wire.write(0x3B);
+    Wire.endTransmission(false);
+    Wire.requestFrom(MPU_addr,14,true);
+    AcX=Wire.read()<<8|Wire.read();
+    AcY=Wire.read()<<8|Wire.read();
+    AcZ=Wire.read()<<8|Wire.read();
+    int xAng = map(AcX,minVal,maxVal,-90,90);
+    int yAng = map(AcY,minVal,maxVal,-90,90);
+    int zAng = map(AcZ,minVal,maxVal,-90,90);
+
+    result.x = RAD_TO_DEG * (atan2(-yAng, -zAng)+PI);
+    result.y = RAD_TO_DEG * (atan2(-xAng, -zAng)+PI);
+    result.z = RAD_TO_DEG * (atan2(-yAng, -xAng)+PI);
+
+    return result;
 }
