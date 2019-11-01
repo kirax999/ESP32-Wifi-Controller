@@ -115,8 +115,6 @@ void loop()
             while (lineChar[i] != 0)
                 udpSend.write((uint8_t)lineChar[i++]);
             udpSend.endPacket();
-
-            Serial.println(jsonString);
         }
     }
 }
@@ -127,7 +125,6 @@ gyroscope getAngles() { // return Struc Gyroscope containe 3axis
     int16_t AcX,AcY,AcZ;
     int minVal=265;
     int maxVal=402;
-
     Wire.beginTransmission(MPU_addr);
     Wire.write(0x3B);
     Wire.endTransmission(false);
@@ -142,6 +139,13 @@ gyroscope getAngles() { // return Struc Gyroscope containe 3axis
     result.x = RAD_TO_DEG * (atan2(-yAng, -zAng)+PI);
     result.y = RAD_TO_DEG * (atan2(-xAng, -zAng)+PI);
     result.z = RAD_TO_DEG * (atan2(-yAng, -xAng)+PI);
+
+    Serial.print("x:");
+    Serial.print(result.x);
+    Serial.print("\t y:");
+    Serial.print(result.y);
+    Serial.print("\t z:");
+    Serial.println(result.z);
 
     return result;
 }
