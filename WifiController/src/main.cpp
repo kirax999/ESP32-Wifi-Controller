@@ -1,5 +1,5 @@
 #include <Arduino.h>
-/*
+
 #if defined(ESP8266)
 #include <ESP8266WiFi.h>          
 #else
@@ -15,9 +15,9 @@
 #endif
 #include <WiFiManager.h>
 #include <Wire.h>
-
+#include <I2Cdev.h>
+#include <MPU6050.h>
 #include <math.h>
-
 #include <ArduinoJson.h>
 
 #define LED         2
@@ -31,19 +31,19 @@
 #define BUFFERSIZE  1024
 
 struct Vector3 {
-    double x;
-    double y;
-    double z;
+    float x;
+    float y;
+    float z;
 };
 
 struct MPUValue {
-    int accX = 0;
-    int accY = 0;
-    int accZ = 0;
-    int temp = 0;
-    int gyrX = 0;
-    int gyrY = 0;
-    int gyrZ = 0;
+    int16_t accX = 0;
+    int16_t accY = 0;
+    int16_t accZ = 0;
+    int16_t temp = 0;
+    int16_t gyrX = 0;
+    int16_t gyrY = 0;
+    int16_t gyrZ = 0;
 };
 
 char data;
@@ -57,19 +57,15 @@ WiFiUDP udp;
 WiFiUDP udpSend;
 char buffer[BUFFERSIZE];
 
+MPU6050 accelgyro;
+
 Vector3 offset;
-Vector3 result;
-
-int minVal=265;
-int maxVal=402;
-
-float angle = 0;
+Vector3 angle;
 
 // Define function
-Vector3 getAngles();
-MPUValue getAngleBrute();
 void calibrateMpu6050();
-void setupMpu6050();
+MPUValue getAngleBrute();
+void getAngle();
 
 void setup()
 {
@@ -84,8 +80,12 @@ void setup()
     udp.begin(PORTUDP);
     udpSend.begin(PORTUDPSEND);
 
-    setupMpu6050();
-    calibrateMpu6050();
+    //Balais init
+    Wire.begin();
+    accelgyro.initialize();
+    delay(1000);
+
+    //calibrateMpu6050();
 }
 
 void loop()
@@ -96,14 +96,16 @@ void loop()
     } 
 
     if(Serial.available()) {
-        data=Serial.read();
-        if(data=='1')
-        {
+        data = Serial.read();
+        if (data == '1') {
             WiFi.disconnect(false, true);
             delay(3000);
             Serial.println("Reset wifi setting and restart");
             wifiManager.resetSettings();
             ESP.restart();
+        } else if (data == '2') {
+            accelgyro.CalibrateGyro(30);
+            accelgyro.CalibrateAccel(30);
         }
     }
 
@@ -121,14 +123,24 @@ void loop()
             String jsonString = "";
             statusSpeed = INTERVAL / 8;
 
-            DynamicJsonDocument tracker(1024);
-            tracker["x"] = result.x;
-            tracker["y"] = result.y;
-            tracker["z"] = result.z;
+            getAngle();
 
+            DynamicJsonDocument tracker(1024);
+            tracker["x"] = angle.x;
+            tracker["y"] = angle.y;
+            tracker["z"] = angle.z;
+            
+            Serial.print("X: ");
+            Serial.print(angle.x);
+            Serial.print("\tY: ");
+            Serial.print(angle.y);
+            Serial.print("\tZ: ");
+            Serial.println(angle.z);
+            
             serializeJson(tracker, jsonString);
 
             udpSend.beginPacket(targetIP, PORTUDPSEND);
+            
             const char* lineChar = jsonString.c_str();
             int i = 0;
             while (lineChar[i] != 0)
@@ -136,61 +148,6 @@ void loop()
             udpSend.endPacket();
         }
     }
-
-    getAngles();
-}
-
-MPUValue getAngleBrute() {
-    MPUValue instant;
-
-    Wire.beginTransmission(0x68);// Start communicating with the MPU-6050
-    Wire.write(0x3B);                   // Send the requested starting register
-    Wire.endTransmission();             // End the transmission
-    Wire.requestFrom(0x68,14);   // Request 14 bytes from the MPU-6050
-
-    while(Wire.available() < 14);
-
-    instant.accX = Wire.read() << 8 | Wire.read(); // Add the low and high byte to the acc_raw[X] variable
-    instant.accY = Wire.read() << 8 | Wire.read(); // Add the low and high byte to the acc_raw[Y] variable
-    instant.accZ = Wire.read() << 8 | Wire.read(); // Add the low and high byte to the acc_raw[Z] variable
-    instant.temp = Wire.read() << 8 | Wire.read(); // Add the low and high byte to the temperature variable
-    instant.gyrX = Wire.read() << 8 | Wire.read(); // Add the low and high byte to the gyro_raw[X] variable
-    instant.gyrY = Wire.read() << 8 | Wire.read(); // Add the low and high byte to the gyro_raw[Y] variable
-    instant.gyrZ = Wire.read() << 8 | Wire.read();
-
-    return instant;
-}
-
-Vector3 getAngles() { // return Struc Gyroscope containe 3axis
-    MPUValue tmp = getAngleBrute();
-    double AcX = (tmp.gyrX - offset.x);
-    double AcY = (tmp.gyrY - offset.y);
-    double AcZ = (tmp.gyrZ - offset.z);
-
-    int x = map(AcX,minVal,maxVal,-90,90);
-    int y = map(AcY,minVal,maxVal,-90,90);
-    int z = map(AcZ,minVal,maxVal,-90,90);
-
-    result.x = RAD_TO_DEG * (atan2(-y, -z)+PI);
-    result.y = RAD_TO_DEG * (atan2(-x, -z)+PI);
-    result.z = RAD_TO_DEG * (atan2(-y, -x)+PI);
-
-    Serial.print("x:");
-    Serial.print(result.x);
-    Serial.print("\t y:");
-    Serial.print(result.y);
-    Serial.print("\t z:");
-    Serial.println(result.z);
-    Serial.println("------------------------------");
-    return result;
-}
-
-void setupMpu6050() {
-    Wire.begin();
-    Wire.beginTransmission(0x68);
-    Wire.write(0x6B);
-    Wire.write(0);
-    Wire.endTransmission(true);
 }
 
 void calibrateMpu6050() {
@@ -218,8 +175,22 @@ void calibrateMpu6050() {
     Serial.print("\n");
     Serial.println("--------------");
 }
-*/
 
+MPUValue getAngleBrute() {
+    MPUValue instant;
+
+    accelgyro.getMotion6(&instant.accX, &instant.accY, &instant.accZ, &instant.gyrX, &instant.gyrY, &instant.gyrZ);
+
+    return instant;
+}
+
+void getAngle() {
+    MPUValue item = getAngleBrute();
+    angle.y = (0.98 * (angle.y + float(item.gyrY) * 0.01/50) + 0.02 * atan2((double)item.accX,(double)item.accZ) * 180 / PI); // Y
+    angle.x = (0.98 * (angle.x + float(item.gyrX) * 0.01/50) + 0.02 * atan2((double)item.accY,(double)item.accZ) * 180 / PI); // X
+    angle.z = (0.98 * (angle.z + float(item.gyrZ) * 0.01/50) + 0.02 * atan2((double)item.accX,(double)item.accY) * 180 / PI); // Z
+}
+/*
 #include <Wire.h>  // Arduino Wire library
 #include <I2Cdev.h>
 #include <MPU6050.h>
@@ -233,7 +204,9 @@ int16_t ax, ay, az;  //mesures brutes
 int16_t gx, gy, gz;
 uint8_t Accel_range;
 uint8_t Gyro_range;
-float angle=0;
+float angleX=0;
+float angleY=0;
+float angleZ=0;
 
 #define BUFFER_LENGTH 1024
  
@@ -256,9 +229,15 @@ void setup() {
  
 void loop() {
     accelgyro.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
-    //angle=0.98*(angle+float(gy)*0.01/131) + 0.02*atan2((double)ax,(double)az)*180/PI; // Y
-    //angle=0.98*(angle+float(gx)*0.01/131) + 0.02*atan2((double)ay,(double)az)*180/PI; // X
-    angle=0.98*(angle+float(gz)*0.01/131) + 0.02*atan2((double)ax,(double)ay)*180/PI; // Z
-    Serial.println(angle); 
+    angleX=0.98*(angleX+float(gy)*0.01/131) + 0.02*atan2((double)ax,(double)az)*180/PI; // Y
+    angleY=0.98*(angleY+float(gx)*0.01/131) + 0.02*atan2((double)ay,(double)az)*180/PI; // X
+    angleZ=0.98*(angleZ+float(gz)*0.01/131) + 0.02*atan2((double)ax,(double)ay)*180/PI; // Z
+    Serial.print("X: ");
+    Serial.print(angleX);
+    Serial.print("\tY: ");
+    Serial.print(angleY);
+    Serial.print("\tZ: ");
+    Serial.println(angleZ);
     delay(10);
 }
+*/

@@ -1,14 +1,13 @@
 -I/Users/alexandrerichet/GitRepo/ESP32-Wifi-Controller/WifiController/include
 -I/Users/alexandrerichet/GitRepo/ESP32-Wifi-Controller/WifiController/src
 -I/Users/alexandrerichet/GitRepo/ESP32-Wifi-Controller/WifiController/.pio/libdeps/esp32doit-devkit-v1/WIFIMANAGER-ESP32-master
+-I/Users/alexandrerichet/GitRepo/ESP32-Wifi-Controller/WifiController/.pio/libdeps/esp32doit-devkit-v1/mpu6050-master/src
+-I/Users/alexandrerichet/.platformio/packages/framework-arduinoespressif32/libraries/Wire/src
 -I/Users/alexandrerichet/GitRepo/ESP32-Wifi-Controller/WifiController/.pio/libdeps/esp32doit-devkit-v1/WebServer-esp32-master/src
 -I/Users/alexandrerichet/.platformio/packages/framework-arduinoespressif32/libraries/FS/src
 -I/Users/alexandrerichet/GitRepo/ESP32-Wifi-Controller/WifiController/.pio/libdeps/esp32doit-devkit-v1/DNSServer---esp32-master/src
 -I/Users/alexandrerichet/.platformio/packages/framework-arduinoespressif32/libraries/WiFi/src
 -I/Users/alexandrerichet/GitRepo/ESP32-Wifi-Controller/WifiController/.pio/libdeps/esp32doit-devkit-v1/ArduinoJson-6.x/src
--I/Users/alexandrerichet/GitRepo/ESP32-Wifi-Controller/WifiController/.pio/libdeps/esp32doit-devkit-v1/I2Cdevlib-MPU6050_ID107
--I/Users/alexandrerichet/GitRepo/ESP32-Wifi-Controller/WifiController/.pio/libdeps/esp32doit-devkit-v1/I2Cdevlib-Core_ID11
--I/Users/alexandrerichet/.platformio/packages/framework-arduinoespressif32/libraries/Wire/src
 -I/Users/alexandrerichet/.platformio/packages/framework-arduinoespressif32/tools/sdk/include/config
 -I/Users/alexandrerichet/.platformio/packages/framework-arduinoespressif32/tools/sdk/include/app_trace
 -I/Users/alexandrerichet/.platformio/packages/framework-arduinoespressif32/tools/sdk/include/app_update
